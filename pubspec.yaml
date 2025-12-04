@@ -1,5 +1,5 @@
 name: fungit_app
-description: "A new Flutter project."
+description: "Fungit - identificación de setas + chat"
 publish_to: 'none'
 version: 0.1.0
 
@@ -9,6 +9,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  provider: ^6.0.5
+  http: ^0.13.5
+  image_picker: ^0.8.7+4
+  path_provider: ^2.0.12
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
@@ -17,3 +23,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/logo_fungit.png
