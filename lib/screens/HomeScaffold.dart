@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'ScanMushroom.dart';
 import 'ChatBot.dart';
@@ -14,16 +12,47 @@ class HomeScaffold extends StatefulWidget {
 
 class _HomeScaffoldState extends State<HomeScaffold> {
   int _currentIndex = 0;
-  final List<Widget> _pages = const [
-    ChatBotScreen(),
-    ScanMushroomScreen(),
-    ConfigScreen(),
-  ];
+  String? _chatbotInitialMessage;
+
+  late List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      ChatBotScreen(
+        key: ValueKey(_chatbotInitialMessage),
+        initialMessage: _chatbotInitialMessage,
+      ),
+      ScanMushroomScreen(onNavigate: changeTab),
+      ConfigScreen(),
+    ];
+  }
+
+  void changeTab(int index, {String? initialMessage}) {
+    setState(() {
+      _currentIndex = index;
+
+      if (index == 0 && initialMessage != null) {
+        _chatbotInitialMessage = initialMessage;
+
+        _pages[0] = ChatBotScreen(
+          key: ValueKey(_chatbotInitialMessage),
+          initialMessage: _chatbotInitialMessage,
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(child: _pages[_currentIndex]),
+      body: SafeArea(
+        child: IndexedStack(
+          index: _currentIndex,
+          children: _pages,
+        ),
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -67,7 +96,7 @@ class _HomeScaffoldState extends State<HomeScaffold> {
                 label: "",
               ),
             ],
-          )
+          ),
         ),
       ),
     );
