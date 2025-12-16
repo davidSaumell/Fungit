@@ -3,9 +3,11 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'ChatBot.dart';
 
 class ScanMushroomScreen extends StatefulWidget {
-  const ScanMushroomScreen({super.key});
+  final void Function(int, {String? initialMessage})? onNavigate;
+  const ScanMushroomScreen({super.key, this.onNavigate});
 
   @override
   State<ScanMushroomScreen> createState() => _ScanMushroomScreenState();
@@ -16,7 +18,7 @@ class _ScanMushroomScreenState extends State<ScanMushroomScreen> {
   bool _uploading = false;
   List<Map<String, dynamic>> _results = [];
   final ImagePicker _picker = ImagePicker();
-  String apiBase = ''; // TODO Add the apiBase url
+  String apiBase = 'http://192.168.0.159:5000/';
 
   Future<void> _takePhoto() async {
     final XFile? photo = await _picker.pickImage(
@@ -55,14 +57,13 @@ class _ScanMushroomScreenState extends State<ScanMushroomScreen> {
       _results = [];
     });
     try {
-      final uri = Uri.parse('\$apiBase/scan');
+      final uri = Uri.parse('${apiBase}identify-mushroom/');
       final req = http.MultipartRequest('POST', uri);
       req.files.add(await http.MultipartFile.fromPath('file', image.path));
       final streamed = await req.send();
       final res = await http.Response.fromStream(streamed);
       if (res.statusCode == 200) {
         final body = json.decode(res.body);
-        // We expect something like: {"results": [{"name": "Agaricus", "score": 0.82}, ...]}
         final list = (body['results'] as List)
             .map((e) => {'name': e['name'], 'score': e['score']})
             .toList();
@@ -97,6 +98,75 @@ class _ScanMushroomScreenState extends State<ScanMushroomScreen> {
 
     setState(() => _image = File(image.path));
     await _uploadImage(File(image.path));
+  }
+
+  Map<String, dynamic> _parseJsonFromResponse(String raw) {
+    final cleaned = raw
+        .replaceAll('```json', '')
+        .replaceAll('```', '')
+        .trim();
+
+    return json.decode(cleaned) as Map<String, dynamic>;
+  }
+
+  String _formatMushroomInfo(Map<String, dynamic> json) {
+    final buffer = StringBuffer();
+
+    buffer.writeln("## 🍄 ${json['nombre_comun'] ?? 'Desconocido'}");
+    buffer.writeln("_${json['nombre_cientifico'] ?? ''}_\n");
+
+    buffer.writeln(
+      "🥗 **Comestible:** ${json['es_comestible'] == 'sí' ? '✅ Sí' : '⚠️ No'}  ",
+    );
+    // buffer.writeln(
+    //   "☠️ **Venenoso:** ${json['venenoso'] == 'sí' ? '⚠️ Sí' : '✅ No'}\n",
+    // );
+
+    if (json['donde_crecen'] != null) {
+      buffer.writeln("### 🌲 Dónde crece");
+      buffer.writeln("${json['donde_crecen']}\n");
+    }
+
+    if (json['como_cocinar'] != null) {
+      buffer.writeln("### 🍳 Cómo cocinar");
+      buffer.writeln("${json['como_cocinar']}\n");
+    }
+
+    if (json['advertencias'] != null) {
+      buffer.writeln("### ⚠️ Advertencias");
+      buffer.writeln("${json['advertencias']}");
+    }
+
+    return buffer.toString();
+  }
+
+  Future<void> _openMushroomInfo(String name) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${apiBase}get-mushroom-info/'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'mushroom_name': name}),
+      );
+
+      final body = json.decode(res.body);
+
+      if (res.statusCode == 200) {
+        if (!mounted) return;
+
+        final rawResponse = body["response"] as String;
+        final mushroomJson = _parseJsonFromResponse(rawResponse);
+        final formattedText = _formatMushroomInfo(mushroomJson);
+
+        widget.onNavigate?.call(
+          0,
+          initialMessage: formattedText,
+        );
+      } else {
+        _showError(body["error"] ?? "Error en la API");
+      }
+    } catch (e) {
+      _showError("Error de conexión");
+    }
   }
 
   @override
@@ -225,22 +295,24 @@ class _ScanMushroomScreenState extends State<ScanMushroomScreen> {
 
               const SizedBox(height: 20),
 
-              const Text(
-                "¡Haz una foto o súbela de tu galería para poder analizarla y obtener una predicción de qué especie de seta se trata!",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  height: 1.35,
+              if (_image == null)
+                Text(
+                  "¡Haz una foto o súbela de tu galería para poder analizarla y obtener una predicción de qué especie de seta se trata!\n\n"
+                  "Para obtener mejores resultados, asegúrate de que la foto muestre claramente la copa y el tallo de la seta, "
+                  "sin que esté cubierta por musgo, hojas o hierbas. Evita sombras fuertes y trata de que toda la seta esté enfocada.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.35,
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
               if (_uploading) const CircularProgressIndicator(),
 
               const SizedBox(height: 20),
 
-              if (_results.isNotEmpty)
+              if (_results.isNotEmpty && _image != null)
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -250,7 +322,17 @@ class _ScanMushroomScreenState extends State<ScanMushroomScreen> {
                     final percent = ((r['score'] as num) * 100).toStringAsFixed(1);
                     return ListTile(
                       title: Text(r['name']),
-                      trailing: Text("$percent%"),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text("$percent%"),
+                          const SizedBox(width: 12),
+                          IconButton(
+                            icon: const Icon(Icons.info_outline, color: Color(0xFF2E5E3A)),
+                            onPressed: () => _openMushroomInfo(r['name']),
+                          )
+                        ],
+                      ),
                     );
                   },
                 ),
