@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import '../ThemeProvider.dart';
+import 'package:provider/provider.dart';
+
 
 class ChatBotScreen extends StatefulWidget {
-  const ChatBotScreen({super.key});
+  final String? initialMessage;
 
+  const ChatBotScreen({super.key, this.initialMessage});
+  
   @override
   State<ChatBotScreen> createState() => _ChatBotScreenState();
 }
@@ -13,26 +19,87 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
   final List<Map<String, String>> _messages = [];
   final _ctrl = TextEditingController();
   bool _sending = false;
-  String apiBase = ''; // TODO Add the apiBase url
+  String apiBase = 'http://192.168.0.159:5000/';
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialMessage != null) {
+      _messages.add({'role': 'bot', 'text': widget.initialMessage!});
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatBotScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialMessage != null &&
+        widget.initialMessage != oldWidget.initialMessage) {
+      setState(() {
+        _messages.add({'role': 'bot', 'text': widget.initialMessage!});
+      });
+    }
+  }
+
+  String _buildPromptWithContext(String userInput) {
+    final buffer = StringBuffer();
+
+    buffer.writeln(
+      "Eres Mushie, un asistente experto en micología. "
+      "Responde de forma clara, concisa y basada en hechos científicos.\n"
+    );
+
+    if (_messages.isNotEmpty) {
+      buffer.writeln("Este es el contexto de la conversación hasta ahora:\n");
+
+      for (final msg in _messages) {
+        final role = msg['role'] == 'user' ? 'Usuario' : 'Asistente';
+        final text = msg['text'] ?? '';
+        buffer.writeln("$role: $text\n");
+      }
+    }
+
+    buffer.writeln("Pregunta actual del usuario:");
+    buffer.writeln(userInput);
+
+    return buffer.toString();
+  }
 
   Future<void> _send(String text) async {
     if (text.trim().isEmpty) return;
-    setState(() => _sending = true);
-    _messages.add({'role': 'user', 'text': text});
+    setState(() {
+      _sending = true;
+      _messages.add({'role': 'user', 'text': text});
+    });
     _ctrl.clear();
+
+    final prompt = _buildPromptWithContext(text);
+
     try {
       final res = await http.post(
-        Uri.parse('\$apiBase/chat'),
+        Uri.parse('${apiBase}ask-chatbot/'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'message': text}),
+        body: json.encode({'message': prompt}),
       );
       final body = json.decode(res.body);
-      final reply = body['reply'] ?? 'Sin respuesta';
-      _messages.add({'role': 'bot', 'text': reply});
+      final reply = body['response'] ?? 'Sin respuesta';
+      if (mounted) {
+        setState(() {
+          _messages.add({'role': 'bot', 'text': reply});
+        });
+      }
     } catch (e) {
-      _messages.add({'role': 'bot', 'text': 'Error de conexión con la API'});
+      if (mounted) {
+        setState(() {
+          _messages.add({
+            'role': 'bot',
+            'text': '❌ Error de conexión con la API'
+          });
+        });
+      }
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted) {
+        setState(() => _sending = false);
+      }
     }
   }
 
@@ -111,7 +178,16 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
                     color: isUser ? Colors.grey[300] : Colors.green[100],
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(msg['text'] ?? ''),
+                  child: MarkdownBody(
+                    data: msg['text'] ?? '',
+                    styleSheet: MarkdownStyleSheet(
+                      h2: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      h3: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      p: const TextStyle(fontSize: 16),
+                      em: const TextStyle(fontStyle: FontStyle.italic),
+                      strong: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
               );
             },
