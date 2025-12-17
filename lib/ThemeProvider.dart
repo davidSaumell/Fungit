@@ -30,7 +30,7 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   Color get userMessageColor => _themeMode == ThemeMode.dark ? Colors.grey[700]! : Colors.grey[300]!;
-  Color get botMessageColor => _themeMode == ThemeMode.dark ? Colors.green[800]! : Colors.green[100]!;
+  Color get botMessageColor => _themeMode == ThemeMode.dark ? Color(0xFF2E5E3A) : Colors.green[100]!;
   Color get inputColor => _themeMode == ThemeMode.dark ? Colors.grey[850]! : Colors.white;
 
   ThemeData get lightTheme => ThemeData(

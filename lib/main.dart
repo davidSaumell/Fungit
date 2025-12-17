@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'ThemeProvider.dart';
 // TODO add user verification screens
-// import 'screens/Splash.dart';
+import 'screens/Splash.dart';
 // import 'screens/LogIn.dart';
 // import 'screens/Singup.dart';
 import 'screens/HomeScaffold.dart';
@@ -33,13 +33,13 @@ class FungitApp extends StatelessWidget {
           //   GlobalCupertinoLocalizations.delegate,
           // ],
           // supportedLocales: const [Locale('es'), Locale('en'), Locale('ca')],
-          initialRoute: '/home',
+          initialRoute: '/splash',
           routes: {
+            '/splash': (_) => const SplashScreen(),
+            '/home': (_) => const HomeScaffold(),
             // TODO add user verification screens
-            // '/splash': (_) => const SplashScreen(),
             // '/login': (_) => const LogInScreen(),
             // '/signup': (_) => const SignInScreen(),
-            '/home': (_) => const HomeScaffold(),
           },
         ),
       ),

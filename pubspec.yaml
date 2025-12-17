@@ -26,3 +26,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/logo_fungit.png
+    - assets/images/logo_fungit_negro.png
